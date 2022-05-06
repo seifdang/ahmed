@@ -1,34 +1,94 @@
-const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
-const Joi = require("joi");
-const passwordComplexity = require("joi-password-complexity");
+const router = require("express").Router();
+const multer = require("multer")
+const { Members,validate } = require("../models/members");
+const bcrypt = require("bcrypt");
 
-const userSchema = new mongoose.Schema({
-	firstName: { type: String, required: true },
-	lastName: { type: String, required: true },
-	position: { type: String, required: true },
-	positionn: { type: String, required: true },
+router.post("/register", async (req, res) => {
+	try {
+		const { error } = validate(req.body);
+		if (error)
+			return res.status(400).send({ message: error.details[0].message });
+
+		const user = await User.findOne({ email: req.body.email });
+		if (user)
+			return res
+				.status(409)
+				.send({ message: "User with given email already Exist!" });
+
+		const salt = await bcrypt.genSalt(Number(process.env.SALT));
+		const hashPassword = await bcrypt.hash(req.body.password, salt);
+
+		await new User({ ...req.body, password: hashPassword }).save();
+		res.status(201).send({ message: "User created successfully" });
+	} catch (error) {
+		res.status(500).send({ message: "Internal Server Error" });
+		console.log(error)
+	}
+});
+router.get("/", async (req,res)=>{
+    Members.find()
+.then(data => {
+
+if (data==0) {
+  res.status(500).send({
+      message:"There are no user"
+  });
+}else{
 	
+  res.status(200).send( data );
+}
+  
+})
+  .catch(err => {
+res.status(500).send({
+  message:
+    err.message || "Some error occurred."
+});
+});
+})
+
+
+router.post("/members", async (req, res) => {
+	try {
+		console.log("hello")
+		
+		const { error } = validate(req.body);
+		if (error)
+			return res.status(400).send({ message: error.details[0].message });
+
+		const user = await Members.findOne({ firstName: req.body.firstName,lastName:req.body.lastName });
+		if (user)
+			return res
+				.status(409)
+				.send({ message: "User with given email already Exist!" });
+
+		
+
+		await new Members({ ...req.body}).save();
+		res.status(201).send({ message: "User created successfully" });
+	} catch (error) {
+		res.status(500).send({ message: "Internal Server Error" });
+		console.log(error)
+	}
+	const storage = multer.diskStorage({
+		destination:(req,file,cb) =>{
+			cb(null,'public')
+		},
+		filename:(req,file,cb) =>{
+			cb(null,Date.now() +'-' + file.originalname)
+		}
+	});
+	
+	const upload = multer({storage}).single('file');
+	
+		upload(req,res, (err)  => {
+			if(err){
+				return res.status(500).json(err)
+			}
+			return res.status(200).send(req.file)
+			
+	
+	})
 });
 
-userSchema.methods.generateAuthToken = function () {
-	const token = jwt.sign({ _id: this._id }, process.env.JWTPRIVATEKEY, {
-		expiresIn: "7d",
-	});
-	return token;
-};
-
-const Members = mongoose.model("members", userSchema);
-
-const validate = (data) => {
-	const schema = Joi.object({
-		firstName: Joi.string().required().label("First Name"),
-		lastName: Joi.string().required().label("Last Name"),
-		position: Joi.string().required().label("Email"),
-		positionn: Joi.string().required().label("password	"),
-
-	});
-	return schema.validate(data);
-};
-
-module.exports = { Members ,validate};
+module.exports = router;

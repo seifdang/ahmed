@@ -1,30 +1,53 @@
-const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
-const Joi = require("joi");
-const passwordComplexity = require("joi-password-complexity");
+const router = require("express").Router();
 
-const userSchema = new mongoose.Schema({
-	firstName: { type: String, required: true },
-	position: { type: String, required: true },
+const { Visits,validate } = require("../models/visits");
+const bcrypt = require("bcrypt");
+
+
+router.get("/", async (req,res)=>{
+    Visits.find()
+.then(data => {
+
+if (data==0) {
+  res.status(500).send({
+      message:"There are no user"
+  });
+}else{
 	
+  res.status(200).send( data );
+}
+  
+})
+  .catch(err => {
+res.status(500).send({
+  message:
+    err.message || "Some error occurred."
+});
+});
+})
+
+router.post("/visits", async (req, res) => {
+	try {
+		console.log("helloo")
+		
+		const { error } = validate(req.body);
+		if (error)
+			return res.status(400).send({ message: error.details[0].message });
+
+		const user = await Visits.findOne({ firstName: req.body.firstName });
+		if (user)
+			return res
+				.status(409)
+				.send({ message: "User with given email already Exist!" });
+
+		
+
+		await new Visits({ ...req.body}).save();
+		res.status(201).send({ message: "User created successfully" });
+	} catch (error) {
+		res.status(500).send({ message: "Internal Server Error" });
+		console.log(error)
+	}
 });
 
-userSchema.methods.generateAuthToken = function () {
-	const token = jwt.sign({ _id: this._id }, process.env.JWTPRIVATEKEY, {
-		expiresIn: "7d",
-	});
-	return token;
-};
-
-const Visits = mongoose.model("visits", userSchema);
-
-const validate = (data) => {
-	const schema = Joi.object({
-		firstName: Joi.string().required().label("First Name"),
-		position: Joi.string().required().label("Email"),
-
-	});
-	return schema.validate(data);
-};
-
-module.exports = { Visits ,validate};
+module.exports = router;
